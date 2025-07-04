@@ -558,7 +558,7 @@ export function WebGLSolarSystem({
         x: Math.cos(angle) * distance,
         z: Math.sin(angle) * distance,
         size: 0.1 + Math.random() * 0.25, // Asteroides más pequeños para mayor densidad visual
-        speed: 0.0008 + Math.random() * 0.0004,
+        speed: 0.5 + Math.random() * 1,
         color: `hsl(${25 + Math.random() * 50}, 80%, ${40 + Math.random() * 30}%)` // Colores más brillantes
       })
     }
