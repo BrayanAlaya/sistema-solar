@@ -21,6 +21,7 @@ import {
   Info,
   Eye,
   Lightbulb,
+  Circle,
 } from "lucide-react"
 
 interface ControlPanelProps {
@@ -46,6 +47,8 @@ interface ControlPanelProps {
   setAudioEnabled: (enabled: boolean) => void
   audioVolume: number
   setAudioVolume: (volume: number) => void
+  showAsteroids: boolean
+  setShowAsteroids: (show: boolean) => void
 }
 
 export function ControlPanel({
@@ -71,6 +74,8 @@ export function ControlPanel({
   setAudioEnabled,
   audioVolume,
   setAudioVolume,
+  showAsteroids,
+  setShowAsteroids,
 }: ControlPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -225,6 +230,14 @@ export function ControlPanel({
                 Iluminación realista
               </span>
               <Switch checked={showIllumination} onCheckedChange={setShowIllumination} />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-white flex items-center gap-2">
+                <Circle className="h-4 w-4" />
+                Cinturón de asteroides
+              </span>
+              <Switch checked={showAsteroids} onCheckedChange={setShowAsteroids} />
             </div>
 
             <div className="text-xs text-gray-400 mt-2">

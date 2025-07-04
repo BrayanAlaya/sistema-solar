@@ -3,6 +3,28 @@
 import { useEffect, useRef } from "react"
 import { planetData } from "@/lib/planet-data"
 
+interface Asteroid {
+  x: number
+  z: number
+  size: number
+  speed: number
+  color: string
+}
+
+interface Comet {
+  name: string
+  x: number
+  z: number
+  speed: number
+  startX: number // Punto de inicio del viaje
+  startZ: number
+  endX: number // Punto final del viaje
+  endZ: number
+  progress: number // Progreso del viaje (0 a 1)
+  direction: number // 1 para ida, -1 para vuelta
+  color: string
+}
+
 interface WebGLSolarSystemProps {
   timeSpeed: number
   isPaused: boolean
@@ -13,6 +35,7 @@ interface WebGLSolarSystemProps {
   selectedPlanet: string | null
   followPlanet: boolean
   showIllumination: boolean
+  showAsteroids: boolean
 }
 
 export function WebGLSolarSystem({
@@ -25,6 +48,7 @@ export function WebGLSolarSystem({
   selectedPlanet,
   followPlanet,
   showIllumination,
+  showAsteroids,
 }: WebGLSolarSystemProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const timeRef = useRef<number>(0)
@@ -49,6 +73,10 @@ export function WebGLSolarSystem({
   const starsRef = useRef<{ x: number; y: number; z: number; brightness: number }[]>([])
   const texturesRef = useRef<Record<string, HTMLImageElement>>({})
   const texturesLoadedRef = useRef<Record<string, boolean>>({})
+
+  // Agregar nueva ref para asteroides
+  const asteroidsRef = useRef<Asteroid[]>([])
+  const cometsRef = useRef<Comet[]>([])
 
   // Initialize stars once
   const initializeStars = () => {
@@ -405,23 +433,6 @@ export function WebGLSolarSystem({
     ctx.ellipse(centerX, centerY, middleRadius, middleRadius * 0.3, 0, 0, Math.PI * 2)
     ctx.stroke()
     ctx.restore()
-
-    // Eliminar esta sección completa (líneas aproximadamente 400-415):
-    // Add ring particles effect for close-up view
-    // if (scale > 0.5) {
-    //   const particleCount = Math.min(50, Math.floor(scale * 30))
-    //   for (let i = 0; i < particleCount; i++) {
-    //     const angle = (i / particleCount) * Math.PI * 2
-    //     const ringRadius = innerRadius + Math.random() * (outerRadius - innerRadius)
-    //     const particleX = centerX + Math.cos(angle) * ringRadius
-    //     const particleY = centerY + Math.sin(angle) * ringRadius * 0.3
-
-    //     ctx.fillStyle = `rgba(200, 180, 140, ${0.3 + Math.random() * 0.4})`
-    //     ctx.beginPath()
-    //     ctx.arc(particleX, particleY, Math.max(0.5, scale * 0.8), 0, Math.PI * 2)
-    //     ctx.fill()
-    //   }
-    // }
   }
 
   // Draw orbit ring
@@ -535,6 +546,147 @@ export function WebGLSolarSystem({
     return `rgb(${r}, ${g}, ${b})`
   }
 
+  // Agregar función para generar asteroides
+  const generateAsteroidBelt = (): Asteroid[] => {
+    const asteroids: Asteroid[] = []
+    
+    for (let i = 0; i < 600; i++) { // Más asteroides para compensar el rango más pequeño
+      const angle = Math.random() * Math.PI * 2
+      const distance = 16.8 + Math.random() * 1.0 // Cinturón aún más comprimido (entre 16.8-17.8)
+      
+      asteroids.push({
+        x: Math.cos(angle) * distance,
+        z: Math.sin(angle) * distance,
+        size: 0.1 + Math.random() * 0.25, // Asteroides más pequeños para mayor densidad visual
+        speed: 0.0008 + Math.random() * 0.0004,
+        color: `hsl(${25 + Math.random() * 50}, 80%, ${40 + Math.random() * 30}%)` // Colores más brillantes
+      })
+    }
+    
+    return asteroids
+  }
+
+  // Función para dibujar asteroides
+  const drawAsteroids = (
+    ctx: CanvasRenderingContext2D,
+    asteroids: Asteroid[],
+    camera: typeof cameraRef.current,
+    canvas: HTMLCanvasElement,
+    time: number
+  ) => {
+    asteroids.forEach((asteroid) => {
+      // Actualizar posición orbital
+      const currentAngle = Math.atan2(asteroid.z, asteroid.x) + asteroid.speed * time
+      const distance = Math.sqrt(asteroid.x * asteroid.x + asteroid.z * asteroid.z)
+      
+      const x = Math.cos(currentAngle) * distance * 5
+      const y = 0
+      const z = Math.sin(currentAngle) * distance * 5
+
+      const projected = project3D(x, y, z, camera, canvas)
+      if (!projected || projected.depth <= 0) return
+
+      const size = Math.max(0.5, asteroid.size * projected.scale * 3) // Hacer asteroides más grandes
+      
+      // Hacer asteroides más visibles
+      ctx.fillStyle = asteroid.color
+      ctx.globalAlpha = 0.9 // Aumentar opacidad
+      ctx.beginPath()
+      ctx.arc(projected.x, projected.y, size, 0, Math.PI * 2)
+      ctx.fill()
+      
+      // Añadir un pequeño brillo para hacerlos más visibles
+      ctx.strokeStyle = asteroid.color
+      ctx.lineWidth = 1
+      ctx.stroke()
+      
+      ctx.globalAlpha = 1
+    })
+  }
+
+  // Función para generar cometas
+  const generateComets = (): Comet[] => {
+    const comets: Comet[] = []
+    
+    for (let i = 0; i < 8; i++) { // 8 cometas para buen rendimiento
+      const speed = 0.001 + Math.random() * 0.002 // Velocidad más lenta para recorridos largos
+
+      // Generar puntos de inicio y fin MUCHO más distantes
+      // Los cometas vienen desde muy lejos del espacio exterior
+      const angle1 = Math.random() * Math.PI * 2
+      const angle2 = Math.random() * Math.PI * 2
+      const distance1 = 200 + Math.random() * 300 // Punto de inicio MUY lejano
+      const distance2 = 150 + Math.random() * 250 // Punto final también lejano
+      
+      const startX = Math.cos(angle1) * distance1
+      const startZ = Math.sin(angle1) * distance1
+      const endX = Math.cos(angle2) * distance2
+      const endZ = Math.sin(angle2) * distance2
+      
+      comets.push({
+        name: `Cometa-${i + 1}`,
+        x: startX, // Empezar en el punto de inicio
+        z: startZ,
+        speed,
+        startX,
+        startZ,
+        endX,
+        endZ,
+        progress: 0, // Empezar desde el inicio del viaje
+        direction: 1, // Empezar yendo hacia adelante
+        color: `hsl(${25 + Math.random() * 40}, 85%, ${55 + Math.random() * 20}%)`, // Colores dorados/naranjas
+      })
+    }
+    
+    return comets
+  }
+
+  // Función para dibujar cometas
+  const drawComets = (
+    ctx: CanvasRenderingContext2D,
+    comets: Comet[],
+    camera: typeof cameraRef.current,
+    canvas: HTMLCanvasElement,
+    time: number
+  ) => {
+    comets.forEach((comet) => {
+      // Actualizar progreso del viaje lineal
+      comet.progress += comet.direction * comet.speed
+      
+      // Cambiar dirección cuando llega a los extremos
+      if (comet.progress >= 1) {
+        comet.progress = 1
+        comet.direction = -1 // Regresar
+      } else if (comet.progress <= 0) {
+        comet.progress = 0
+        comet.direction = 1 // Ir hacia adelante
+      }
+      
+      // Calcular posición actual usando interpolación lineal
+      const t = comet.progress
+      const x = comet.startX + (comet.endX - comet.startX) * t
+      const y = 0
+      const z = comet.startZ + (comet.endZ - comet.startZ) * t
+      
+      comet.x = x
+      comet.z = z
+
+      const projected = project3D(x, y, z, camera, canvas)
+      if (!projected || projected.depth <= 0) return
+
+      // Dibujar núcleo del cometa sin cola ni efectos de brillo
+      const distanceFromSun = Math.sqrt(x * x + y * y + z * z)
+      const brightness = Math.max(0.3, 1 - distanceFromSun / 150)
+      const cometSize = Math.max(3, 6 * projected.scale * brightness)
+      
+      // Dibujar núcleo simple sin efectos de luz ni cola
+      ctx.fillStyle = comet.color
+      ctx.beginPath()
+      ctx.arc(projected.x, projected.y, cometSize, 0, Math.PI * 2)
+      ctx.fill()
+    })
+  }
+
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -630,6 +782,16 @@ export function WebGLSolarSystem({
     canvas.addEventListener("mouseup", handleMouseUp)
     canvas.addEventListener("wheel", handleWheel)
     canvas.addEventListener("click", handleClick)
+
+    // Inicializar asteroides
+    if (asteroidsRef.current.length === 0) {
+      asteroidsRef.current = generateAsteroidBelt()
+    }
+
+    // Inicializar cometas
+    if (cometsRef.current.length === 0) {
+      cometsRef.current = generateComets()
+    }
 
     // Animation loop
     const animate = () => {
@@ -773,6 +935,14 @@ export function WebGLSolarSystem({
         }
       })
 
+      // Draw asteroids BEFORE sorting objects (so they appear behind planets)
+      if (showAsteroids) {
+        drawAsteroids(ctx, asteroidsRef.current, cameraRef.current, canvas, timeRef.current)
+      }
+
+      // Draw comets
+      drawComets(ctx, cometsRef.current, cameraRef.current, canvas, timeRef.current)
+
       // Sort by depth (far to near)
       objects.sort((a, b) => b.depth - a.depth)
 
@@ -841,7 +1011,7 @@ export function WebGLSolarSystem({
 
       // Draw UI info
       ctx.fillStyle = "rgba(0, 0, 0, 0.7)"
-      ctx.fillRect(10, 10, 320, 180)
+      ctx.fillRect(10, 10, 320, 200) // Hacer panel un poco más alto
 
       ctx.fillStyle = "#ffffff"
       ctx.font = "16px Arial"
@@ -869,9 +1039,12 @@ export function WebGLSolarSystem({
       const totalTextures = Object.keys(texturesLoadedRef.current).length
       const loadedTextures = Object.values(texturesLoadedRef.current).filter(Boolean).length
       ctx.fillText(`Texturas: ${loadedTextures}/${totalTextures}`, 20, 155)
+      
+      // Show asteroids info
+      ctx.fillText(`Asteroides: ${showAsteroids ? asteroidsRef.current.length : 'Desactivados'}`, 20, 175)
 
       if (selectedPlanet) {
-        ctx.fillText(`Seleccionado: ${selectedPlanet}`, 20, 175)
+        ctx.fillText(`Seleccionado: ${selectedPlanet}`, 20, 195)
       }
       if (isPaused) {
         ctx.fillStyle = "#ffff00"
@@ -905,6 +1078,7 @@ export function WebGLSolarSystem({
     selectedPlanet,
     followPlanet,
     showIllumination,
+    showAsteroids,
   ])
 
   return <canvas ref={canvasRef} className="w-full h-full" />

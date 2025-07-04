@@ -17,6 +17,7 @@ export default function Home() {
   const [showMoons, setShowMoons] = useState(true)
   const [followPlanet, setFollowPlanet] = useState(false)
   const [showIllumination, setShowIllumination] = useState(true)
+  const [showAsteroids, setShowAsteroids] = useState(true)
   const [audioEnabled, setAudioEnabled] = useState(false)
   const [audioVolume, setAudioVolume] = useState(0.5)
   const { toast } = useToast()
@@ -117,11 +118,14 @@ export default function Home() {
         selectedPlanet={selectedPlanet}
         followPlanet={followPlanet}
         showIllumination={showIllumination}
+        showAsteroids={showAsteroids}
       />
 
       <ControlPanel
         timeSpeed={timeSpeed}
         setTimeSpeed={setTimeSpeed}
+        showAsteroids={showAsteroids}
+        setShowAsteroids={setShowAsteroids}
         isPaused={isPaused}
         setIsPaused={setIsPaused}
         showOrbits={showOrbits}
